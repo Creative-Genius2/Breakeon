@@ -322,7 +322,41 @@ def unwrap_chains(name: str) -> str:
     return name
 
 
-# ─── PATTERN 7: REMAKES / PORTS ─────────────────────────────────────
+# ─── PATTERN 10+11: SONIC GENESIS TITLES ────────────────────────────
+
+def handle_sonic_genesis(name: str) -> str:
+    """Handle Sonic's original trilogy and lock-on combos.
+
+    Pattern 10: "Sonic the Hedgehog [N]" → "Sonic [N]", bare → "Sonic 1"
+    Pattern 11: "Sonic & Knuckles + Sonic the Hedgehog [N]" → "Sonic [N] & Knuckles"
+    """
+    # Pattern 11: lock-on detection — look for + separator
+    if "+" in name:
+        parts = [p.strip() for p in name.split("+")]
+        sk_part = None
+        sonic_part = None
+        for p in parts:
+            if re.match(r"sonic\s*&\s*knuckles", p, re.IGNORECASE):
+                sk_part = p
+            elif re.search(r"sonic", p, re.IGNORECASE):
+                sonic_part = p
+        if sk_part and sonic_part:
+            # Extract number from the sonic part
+            m = re.search(r"(\d+)", sonic_part)
+            num = m.group(1) if m else None
+            if num:
+                return f"Sonic {num} & Knuckles"
+
+    # Pattern 10: "Sonic the Hedgehog [N]" → "Sonic [N]" or "Sonic 1"
+    m = re.match(r"Sonic\s+the\s+Hedgehog\s*(\d*)", name, re.IGNORECASE)
+    if m:
+        num = m.group(1).strip()
+        return f"Sonic {num}" if num else "Sonic 1"
+
+    return ""  # not a genesis Sonic title
+
+
+
 
 REMAKE_LABELS = [
     "Super Mario Advance",
@@ -399,6 +433,11 @@ def friendly_name(raw_title: str, compact: bool = False) -> str:
     # ── Adjustment 3: Unicode fixes
     name = fix_unicode(name)
 
+    # ── Pattern 10+11: Sonic Genesis titles (before anything else)
+    sonic_result = handle_sonic_genesis(name)
+    if sonic_result:
+        return sonic_result
+
     # ── Pattern 7: Handle remakes first (before generic split)
     name = handle_remakes(name)
 
@@ -463,6 +502,14 @@ def auto_name_or_override(rom_path: str, user_name: str = "", compact: bool = Fa
 
 if __name__ == "__main__":
     test_cases = [
+        # Sonic Genesis + lock-on
+        ("Sonic the Hedgehog (USA)", "Sonic 1"),
+        ("Sonic the Hedgehog 2 (USA)", "Sonic 2"),
+        ("Sonic the Hedgehog 3 (USA)", "Sonic 3"),
+        ("Sonic & Knuckles (USA)", "Sonic & Knuckles"),
+        ("Sonic & Knuckles + Sonic the Hedgehog 3 (USA)", "Sonic 3 & Knuckles"),
+        ("Sonic & Knuckles + Sonic the Hedgehog 2 (USA)", "Sonic 2 & Knuckles"),
+
         # Pokémon — mainline keeps "Pokémon [X]"
         ("Pokemon Platinum Version (USA)", "Pokémon Platinum"),
         ("Pokemon HeartGold Version (USA)", "Pokémon HeartGold"),

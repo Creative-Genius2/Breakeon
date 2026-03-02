@@ -109,6 +109,20 @@
 
 **PATTERN: Sonic games are already short. Keep full name. Drop long subtitles.**
 
+### SONIC GENESIS (GBA/MD — original trilogy + lock-on)
+| Official Title | What People Say | Pattern |
+|---|---|---|
+| Sonic the Hedgehog | Sonic 1 | Drop "the Hedgehog", add "1" |
+| Sonic the Hedgehog 2 | Sonic 2 | Drop "the Hedgehog" |
+| Sonic the Hedgehog 3 | Sonic 3 | Drop "the Hedgehog" |
+| Sonic & Knuckles | Sonic & Knuckles | Keep full (it IS the name) |
+| Sonic & Knuckles + Sonic the Hedgehog 3 | Sonic 3 & Knuckles | Flip order, drop "the Hedgehog" |
+| Sonic & Knuckles + Sonic the Hedgehog 2 | Sonic 2 & Knuckles | Flip order, drop "the Hedgehog" |
+
+**PATTERN: "Sonic the Hedgehog" → "Sonic", add "1" if no number follows. Lock-on ROMs use "+" in the filename — detect this, extract the Sonic number, flip to "[Sonic N] & Knuckles" order. The community name always puts the numbered game first.**
+
+**NOTE: Lock-on filenames vary by dumper. Common forms: "Sonic & Knuckles + Sonic the Hedgehog 3", "Sonic and Knuckles & Sonic 3". The `+` separator is the reliable signal.**
+
 ### YU-GI-OH! (DS/GBA)
 | Official Title | What People Say | Pattern |
 |---|---|---|
@@ -280,6 +294,25 @@ People use the name of the ORIGINAL game, not the port label.
 - "Sonic Advance" → kept because "Advance" is the game's identity
 
 **Rule: Platform suffixes are kept when needed for disambiguation within the series. Dropped when the context is obvious.**
+
+### Pattern 10: "the [Character]" noise in numbered titles
+When a series name includes a character descriptor that nobody uses in speech:
+- "Sonic the Hedgehog" → "Sonic" ("the Hedgehog" is logo text, not a spoken name)
+- "Sonic the Hedgehog 2" → "Sonic 2"
+- "Sonic the Hedgehog 3" → "Sonic 3"
+- "Sonic the Hedgehog" (no number) → "Sonic 1" (number added to distinguish from the series)
+
+**Rule: Strip "the [Character]" from series names when the descriptor is decorative. Add "1" when stripping leaves a bare name with no number.**
+
+### Pattern 11: Lock-on ROM titles — detect `+` and flip order
+Lock-on ROMs are named with the add-on cart first: `"Sonic & Knuckles + Sonic the Hedgehog 3"`. But the community name puts the base game first: **"Sonic 3 & Knuckles"**.
+
+- `Sonic & Knuckles + Sonic the Hedgehog 3` → **Sonic 3 & Knuckles**
+- `Sonic & Knuckles + Sonic the Hedgehog 2` → **Sonic 2 & Knuckles**
+
+**Rule: If `+` appears and one side is "Sonic & Knuckles", extract the number from the other side and output "[Sonic N] & Knuckles". Always flip to base-game-first order.**
+
+**NOTE: Lock-on filenames vary by dumper. Common forms include `+` and `&` as separators. The presence of "Sonic & Knuckles" alongside another Sonic title is the reliable signal.**
 
 ---
 

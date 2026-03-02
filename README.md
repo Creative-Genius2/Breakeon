@@ -248,4 +248,4 @@ breakeon/
 
 ## Why "Breakeon"
 
-It's the break you take between prompts. It's an Eeveelution that doesn't exist. It's what happens when you tell an AI "I get anxious when you think" and the AI says "what if I babysat a game for you." The name was the human's idea. The auto-naming system was a joint research project that got out of hand in the best way.
+It's the break you take between prompts. It's what happens when you tell an AI "I get anxious when you think" and the AI says "what if I babysat a game for you." The name was the human's idea. The auto-naming system was a joint research project that got out of hand in the best way.
