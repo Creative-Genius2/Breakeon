@@ -1,0 +1,26 @@
+{
+    "games": [
+        {
+            "rom_path": "C:/Users/YOU/roms/Pokemon Platinum Version (USA).nds",
+            "save_path": "C:/Users/YOU/roms/Pokemon Platinum.dsv"
+        },
+        {
+            "rom_path": "C:/Users/YOU/roms/Legend of Zelda, The - The Minish Cap (USA).gba",
+            "save_path": ""
+        },
+        {
+            "rom_path": "C:/Users/YOU/roms/Zelda Phantom Hourglass.nds",
+            "save_path": ""
+        },
+        {
+            "name": "Spirit Tracks",
+            "rom_path": "C:/Users/YOU/roms/my_zelda_rom.nds",
+            "save_path": ""
+        }
+    ],
+    "active_game": 0,
+    "port": 3000,
+    "auto_pause": true,
+    "auto_save": true,
+    "browser": "default"
+}

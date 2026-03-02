@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breakeon</title>
+    <style>
+        /* ===================================================
+           STYLING
+           Dark theme that stays out of the way of the game.
+           The emulator canvas takes up most of the screen.
+        =================================================== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0a0f;
+            color: #c0c0c0;
+            font-family: 'Courier New', monospace;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top bar - shows status and has save/pause buttons */
+        #topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: #111118;
+            border-bottom: 1px solid #222;
+            height: 44px;
+            flex-shrink: 0;
+        }
+
+        #topbar .left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #topbar .title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #f0c040;
+            letter-spacing: 1px;
+        }
+
+        /* Status indicator - green when playing, yellow when paused, red when Claude is done */
+        #status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #40f040;
+            transition: background 0.3s;
+        }
+        #status-dot.paused { background: #f0c040; }
+        #status-dot.stopped { background: #f04040; }
+
+        #status-text {
+            font-size: 12px;
+            color: #888;
+        }
+
+        #topbar .controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        #topbar button {
+            background: #1a1a24;
+            border: 1px solid #333;
+            color: #c0c0c0;
+            padding: 4px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.15s;
+        }
+        #topbar button:hover {
+            background: #252530;
+            border-color: #f0c040;
+            color: #f0c040;
+        }
+
+        /* Status bar - shows what Claude is doing */
+        #statusbar {
+            display: flex;
+            align-items: center;
+            padding: 6px 16px;
+            background: #0d0d14;
+            border-top: 1px solid #1a1a24;
+            height: 36px;
+            flex-shrink: 0;
+            gap: 16px;
+            font-size: 12px;
+        }
+
+        #statusbar .claude-activity {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Pulsing dot - shows Claude is alive and working */
+        #activity-pulse {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #333;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        #activity-pulse.active {
+            background: #40c040;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        #activity-text {
+            color: #555;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: color 0.3s;
+        }
+        #activity-text.active {
+            color: #888;
+        }
+
+        #statusbar .stats {
+            display: flex;
+            gap: 14px;
+            flex-shrink: 0;
+            color: #444;
+        }
+
+        #statusbar .stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        #statusbar .stat-label {
+            color: #333;
+        }
+
+        #statusbar .stat-value {
+            color: #666;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Timer emphasis when actively counting */
+        #elapsed-value.counting {
+            color: #f0c040;
+        }
+
+        /* The emulator lives here - takes up all remaining space */
+        #emulator-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+        }
+
+        /* EmulatorJS mounts its canvas inside this div */
+        #game {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Game switcher dropdown */
+        #game-switcher {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        #game-title {
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 3px;
+            transition: background 0.15s;
+        }
+        #game-title:hover {
+            background: #1a1a24;
+        }
+
+        #game-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background: #151520;
+            border: 1px solid #333;
+            border-radius: 4px;
+            min-width: 220px;
+            z-index: 200;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        #game-dropdown.open { display: block; }
+
+        .game-option {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.1s;
+            font-size: 12px;
+        }
+        .game-option:hover {
+            background: #1a1a28;
+        }
+        .game-option.active {
+            color: #f0c040;
+        }
+        .game-option .platform-tag {
+            font-size: 10px;
+            color: #555;
+            background: #1a1a24;
+            padding: 1px 6px;
+            border-radius: 2px;
+        }
+
+        /* Overlay shown when paused */
+        #pause-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #pause-overlay.visible {
+            display: flex;
+        }
+        #pause-overlay .msg {
+            font-size: 24px;
+            color: #f0c040;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        #pause-overlay .sub {
+            font-size: 14px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR: Status + manual controls -->
+    <div id="topbar">
+        <div class="left">
+            <span class="title">BREAKEON</span>
+            <div id="game-switcher">
+                <span id="game-title" style="font-size: 12px; color: #666; padding-left: 8px; border-left: 1px solid #333;" onclick="toggleGameDropdown()">Loading...</span>
+                <div id="game-dropdown"></div>
+            </div>
+            <div id="status-dot"></div>
+            <span id="status-text">Loading...</span>
+        </div>
+        <div class="controls">
+            <button onclick="manualSave()">SAVE</button>
+            <button onclick="togglePause()">PAUSE</button>
+        </div>
+    </div>
+
+    <!-- STATUS BAR: What Claude is doing right now -->
+    <div id="statusbar">
+        <div class="claude-activity">
+            <div id="activity-pulse"></div>
+            <span id="activity-text">Waiting for Claude...</span>
+        </div>
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-label">TIME</span>
+                <span class="stat-value" id="elapsed-value">0s</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">TOOLS</span>
+                <span class="stat-value" id="tools-value">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">SESSION</span>
+                <span class="stat-value" id="session-value">0s</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- EMULATOR: EmulatorJS renders the game here -->
+    <div id="emulator-container">
+        <div id="game"></div>
+
+        <!-- Shown when game is paused (Claude finished, or manual pause) -->
+        <div id="pause-overlay">
+            <div class="msg">PAUSED</div>
+            <div class="sub">Claude is done — game saved automatically</div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================
+        // DYNAMIC EMULATOR SETUP
+        //
+        // We fetch game info from the server FIRST, then configure
+        // EmulatorJS with the right core. DS games use melonDS,
+        // GBA games use mGBA, etc. Then we load the EmulatorJS
+        // script which reads these globals and boots up.
+        // =====================================================
+
+        // These will be set dynamically after we know which game is active
+        EJS_player = "#game";
+        EJS_gameUrl = "/rom";
+        EJS_gameName = "breakeon";
+        EJS_color = "#1a1a24";
+        EJS_startOnLoaded = true;
+        EJS_DEBUG_XX = false;
+
+        // Default core — will be overwritten before EmulatorJS loads
+        EJS_core = "melonds";
+
+        // Game library state
+        let gameLibrary = [];
+        let activeGameIndex = 0;
+
+        function toggleGameDropdown() {
+            document.getElementById("game-dropdown").classList.toggle("open");
+        }
+
+        // Close dropdown when clicking elsewhere
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest("#game-switcher")) {
+                document.getElementById("game-dropdown").classList.remove("open");
+            }
+        });
+
+        function buildGameDropdown(games, activeIndex) {
+            let dropdown = document.getElementById("game-dropdown");
+            dropdown.innerHTML = "";
+            games.forEach((g, i) => {
+                let opt = document.createElement("div");
+                opt.className = "game-option" + (i === activeIndex ? " active" : "");
+                opt.innerHTML = g.name +
+                    ' <span class="platform-tag">' + g.platform + '</span>';
+                opt.onclick = () => switchGame(i);
+                dropdown.appendChild(opt);
+            });
+        }
+
+        function switchGame(index) {
+            if (index === activeGameIndex) {
+                document.getElementById("game-dropdown").classList.remove("open");
+                return;
+            }
+
+            // Save current game first
+            triggerSave("Switching games");
+
+            fetch("/api/switch-game", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({index: index})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    // Reload the page to boot the new game
+                    window.location.reload();
+                }
+            });
+        }
+
+        // Fetch game info, configure EmulatorJS, then load it
+        fetch("/api/game-info")
+            .then(r => r.json())
+            .then(data => {
+                // Set the correct core for this game's platform
+                EJS_core = data.core || "melonds";
+
+                // Update the title bar
+                document.getElementById("game-title").textContent =
+                    "Now Playing: " + data.name;
+
+                // Build the game switcher dropdown
+                gameLibrary = data.games || [];
+                activeGameIndex = data.active || 0;
+                buildGameDropdown(gameLibrary, activeGameIndex);
+
+                // Check if a save file exists
+                fetch("/save", {method: "HEAD"})
+                    .then(r => {
+                        if (r.ok) {
+                            // EmulatorJS uses this to load cartridge save data
+                            // (your in-game save, like Pokemon Center saves)
+                            EJS_gameSaveUrl = "/save";
+                        }
+                    })
+                    .catch(() => {})
+                    .finally(() => {
+                        // NOW load EmulatorJS — it reads all the EJS_* globals
+                        let script = document.createElement("script");
+                        script.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+                        document.body.appendChild(script);
+                    });
+            })
+            .catch(() => {
+                document.getElementById("game-title").textContent = "No game loaded";
+                // Try loading anyway with defaults
+                let script = document.createElement("script");
+                script.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+                document.body.appendChild(script);
+            });
+
+        // =====================================================
+        // PAUSE / RESUME / SAVE LOGIC
+        //
+        // This is the core "game integration" the hooks use:
+        //
+        // When Claude STARTS thinking:
+        //   -> Server sends us "resume" via polling or websocket
+        //   -> We unpause the emulator, hide the overlay
+        //
+        // When Claude STOPS thinking:
+        //   -> Server sends us "pause"
+        //   -> We trigger a save state, pause emulation, show overlay
+        //
+        // Save states in EmulatorJS work through its built-in API:
+        //   - EJS_emulator.saveState() captures everything (RAM, VRAM,
+        //     CPU registers, exact frame) into a blob
+        //   - EJS_emulator.loadState(blob) restores it perfectly
+        //   - It's like a photograph of the entire console's brain
+        //
+        // This is SEPARATE from in-game saves (like saving at a
+        // Pokemon Center). Save states are instant and capture
+        // everything, even mid-battle.
+        // =====================================================
+
+        let isPaused = false;
+        let emulatorReady = false;
+
+        function setStatus(state, text) {
+            const dot = document.getElementById("status-dot");
+            const txt = document.getElementById("status-text");
+            dot.className = state;  // "playing", "paused", "stopped"
+            txt.textContent = text;
+        }
+
+        function togglePause() {
+            if (isPaused) {
+                resumeGame();
+            } else {
+                pauseGame();
+            }
+        }
+
+        function pauseGame() {
+            if (!emulatorReady || isPaused) return;
+
+            try {
+                // EJS_emulator is the global EmulatorJS instance
+                // .pause() stops the emulation loop — the game freezes
+                // but the canvas stays visible (shows last frame)
+                if (window.EJS_emulator) {
+                    window.EJS_emulator.pause();
+                }
+            } catch (e) {
+                console.warn("Pause failed:", e);
+            }
+
+            isPaused = true;
+            document.getElementById("pause-overlay").classList.add("visible");
+            setStatus("paused", "Paused");
+        }
+
+        function resumeGame() {
+            if (!emulatorReady || !isPaused) return;
+
+            try {
+                // .play() resumes the emulation loop from exactly where it stopped
+                if (window.EJS_emulator) {
+                    window.EJS_emulator.play();
+                }
+            } catch (e) {
+                console.warn("Resume failed:", e);
+            }
+
+            isPaused = false;
+            document.getElementById("pause-overlay").classList.remove("visible");
+            setStatus("", "Playing");
+        }
+
+        function manualSave() {
+            triggerSave("Manual save");
+        }
+
+        function triggerSave(reason) {
+            if (!emulatorReady) return;
+
+            try {
+                // ==================================================
+                // HOW SAVE STATES WORK (the cool part):
+                //
+                // EmulatorJS wraps the emulator core (melonDS) which
+                // has access to the ENTIRE virtual DS hardware state:
+                //
+                //   - ARM9 + ARM7 CPU registers (DS has two processors!)
+                //   - All RAM contents (4MB main RAM + video RAM + etc)
+                //   - GPU state (what's being drawn on both screens)
+                //   - Sound chip state
+                //   - Cartridge state (where in the ROM it's reading)
+                //   - RTC (real-time clock — yes, the DS tracks time)
+                //
+                // .saveState() serializes ALL of that into a single
+                // blob. When you load it back, the game literally
+                // doesn't know anything happened. It's like time-
+                // freezing the console.
+                //
+                // This is different from in-game saving (Pokemon Center):
+                //   In-game save = writes to the cartridge's save RAM
+                //   Save state = photographs the ENTIRE system
+                //
+                // We also call .saveSaveFiles() which flushes the
+                // in-game save (the cartridge save RAM) to disk.
+                // Belt AND suspenders.
+                // ==================================================
+
+                if (window.EJS_emulator) {
+                    // Save state (instant snapshot of everything)
+                    window.EJS_emulator.saveState();
+
+                    // Also flush the in-game save to disk
+                    // This writes the virtual cartridge's save RAM to a file
+                    // so even if save states break somehow, your in-game
+                    // progress at the last Pokemon Center is safe
+                    if (window.EJS_emulator.saveSaveFiles) {
+                        window.EJS_emulator.saveSaveFiles();
+                    }
+                }
+
+                console.log(`[breakeon] ${reason} — state saved`);
+                setStatus("paused", `Saved (${reason})`);
+
+                // Tell our server to back up the save file
+                fetch("/api/save-notify", { method: "POST" }).catch(() => {});
+
+            } catch (e) {
+                console.warn("Save failed:", e);
+            }
+        }
+
+        // =====================================================
+        // HOOK COMMUNICATION
+        //
+        // The Claude Code hooks tell our server "Claude started"
+        // or "Claude stopped." We poll the server to find out.
+        //
+        // Why polling instead of WebSockets? Simpler. The hook
+        // just does an HTTP request. We check every 500ms.
+        // For a game that pauses/resumes, half a second is fine.
+        // =====================================================
+
+        let lastState = "unknown";
+
+        function formatTime(seconds) {
+            if (seconds < 60) return Math.floor(seconds) + "s";
+            let m = Math.floor(seconds / 60);
+            let s = Math.floor(seconds % 60);
+            return m + "m " + s + "s";
+        }
+
+        function describeActivity(data) {
+            // Turn the raw tool/file info into something a human can read
+            // Instead of "Edit" and "/src/api/routes.py" you see:
+            // "Editing src/api/routes.py"
+
+            let tool = data.tool || "";
+            let file = data.file || "";
+
+            // Shorten the file path — just show the last 2-3 parts
+            if (file) {
+                let parts = file.replace(/\\/g, "/").split("/");
+                file = parts.slice(-3).join("/");
+            }
+
+            // Map Claude's internal tool names to friendly verbs
+            let toolVerbs = {
+                "Edit": "Editing",
+                "Write": "Writing",
+                "Read": "Reading",
+                "Bash": "Running command",
+                "Search": "Searching",
+                "Grep": "Searching",
+                "ListFiles": "Browsing files",
+                "AskFollowupQuestion": "Has a question",
+            };
+
+            let verb = toolVerbs[tool] || tool || "Working";
+
+            if (file && tool !== "Bash") {
+                return verb + "  ·  " + file;
+            } else if (file && tool === "Bash") {
+                // For bash, file contains the command snippet
+                return "Running  ·  " + file;
+            } else {
+                return verb + "...";
+            }
+        }
+
+        function updateStatusBar(data) {
+            let pulse = document.getElementById("activity-pulse");
+            let text = document.getElementById("activity-text");
+            let elapsed = document.getElementById("elapsed-value");
+            let tools = document.getElementById("tools-value");
+            let session = document.getElementById("session-value");
+
+            if (data.state === "thinking") {
+                pulse.classList.add("active");
+                text.classList.add("active");
+                text.textContent = describeActivity(data);
+                elapsed.textContent = formatTime(data.elapsed || 0);
+                elapsed.classList.add("counting");
+                tools.textContent = data.tool_count || "0";
+            } else {
+                pulse.classList.remove("active");
+                text.classList.remove("active");
+                text.textContent = "Claude is idle — your turn to review";
+                elapsed.textContent = formatTime(data.elapsed || 0);
+                elapsed.classList.remove("counting");
+                tools.textContent = data.total_tools || "0";
+            }
+
+            // Total thinking time across all prompts this session
+            session.textContent = formatTime(data.total_thinking || 0);
+        }
+
+        async function pollHookState() {
+            try {
+                const res = await fetch("/api/state");
+                const data = await res.json();
+
+                // Always update the status bar with latest info
+                updateStatusBar(data);
+
+                // Handle state transitions (resume/pause game)
+                if (data.state !== lastState) {
+                    lastState = data.state;
+
+                    if (data.state === "thinking") {
+                        resumeGame();
+                    } else if (data.state === "idle") {
+                        triggerSave("Claude finished");
+                        setTimeout(() => pauseGame(), 200);
+                    }
+                }
+            } catch (e) {
+                // Server not responding
+            }
+        }
+
+        // Poll every 500ms
+        setInterval(pollHookState, 500);
+
+        // =====================================================
+        // EMULATOR READY DETECTION
+        //
+        // EmulatorJS fires a custom event when it's done loading
+        // the ROM, initializing the core, and is ready to play.
+        // We listen for that so we know when our controls are safe
+        // to use.
+        // =====================================================
+
+        // EmulatorJS calls this when ready
+        function onEmulatorReady() {
+            emulatorReady = true;
+            setStatus("", "Playing");
+            console.log("[breakeon] Emulator ready!");
+        }
+
+        // Multiple ways EmulatorJS signals readiness depending on version
+        window.addEventListener("load", () => {
+            // Check periodically if emulator has initialized
+            const readyCheck = setInterval(() => {
+                if (window.EJS_emulator && window.EJS_emulator.gameManager) {
+                    clearInterval(readyCheck);
+                    onEmulatorReady();
+                }
+            }, 500);
+
+            // Safety timeout — if it takes more than 30s, something's wrong
+            setTimeout(() => {
+                clearInterval(readyCheck);
+                if (!emulatorReady) {
+                    setStatus("stopped", "Load timeout — check ROM path");
+                }
+            }, 30000);
+        });
+    </script>
+
+
+</body>
+</html>
